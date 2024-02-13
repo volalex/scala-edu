@@ -47,8 +47,14 @@ public class ParallelApplicationStatusHandler implements Handler {
             if (timedResponse.result instanceof Response.Success success) {
                 return CompletableFuture.completedFuture(new ApplicationStatusResponse.Success(success.applicationId(), success.applicationStatus()));
             } else if (timedResponse.result instanceof Response.Failure) {
+                //Failure handling assumes that if services are synchronized,
+                //second and future calls to the same or different service
+                //will return the same failure results.
+                //So there is no waiting for a second request to complete.
+                statsHolder.recordRequest(timedResponse.requestDuration);
                 return CompletableFuture.completedFuture(new ApplicationStatusResponse.Failure(timedResponse.requestDuration, statsHolder.getRetriesCount()));
             } else if (timedResponse.result instanceof Response.RetryAfter retryAfter) {
+                statsHolder.recordRequest(timedResponse.requestDuration);
                 statsHolder.countRetry();
                 var delay = CompletableFuture.delayedExecutor(retryAfter.delay().toMillis(), TimeUnit.MILLISECONDS, executor);
                 return requestAppStatus(responseSupplier, delay, statsHolder);
